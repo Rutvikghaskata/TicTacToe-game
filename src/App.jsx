@@ -9,6 +9,7 @@ import CelebrationSound from "./assets/celebration.mp3";
 import GameSound from "./assets/game.mp3";
 import { GiSoundOn, GiSoundOff } from "react-icons/gi";
 import { TiRefreshOutline } from "react-icons/ti";
+import io from "socket.io-client";
 
 function TicTacToe() {
   const [board, setBoard] = useState(Array(9).fill(null));
@@ -17,6 +18,12 @@ function TicTacToe() {
   const [celebration, setCelebration] = useState(false);
   const [finished, setFinished] = useState(false);
   const [stopedGameSound, setStopedGameSound] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [currentStake, setCurrentStake] = useState();
+  const [user, setUser] = useState();
+  const [selected, setSelected] = useState();
+  const [myTurn, setMyturn] = useState(false);
+
   const gameSound = {
     sound: new Howl({
       src: [GameSound],
@@ -35,23 +42,74 @@ function TicTacToe() {
   };
 
   useEffect(() => {
-    gameSound.sound.play();
+    // gameSound.sound.play();
+    const player = localStorage.getItem("player");
+    if (player) {
+      setCurrentStake(player);
+      setUser(player);
+      setMyturn(player === "X" ? true : false);
+    }
   }, []);
 
-  function handleClick(index) {
+  useEffect(() => {
+    const newSocket = io("https://tic-tac-teo-socket.onrender.com/");
+    setSocket(newSocket);
+
+    return () => newSocket.disconnect();
+  }, []);
+
+  // useEffect(() => {
+  //   if (!xIsNext && !winner && !finished) {
+  //     const timeoutId = setTimeout(() => {
+  //       const newBoard = [...board];
+  //       let moveMade = false;
+  //       while (!moveMade) {
+  //         const randomIndex = Math.floor(Math.random() * 9);
+  //         if (!newBoard[randomIndex]) {
+  //           newBoard[randomIndex] = "O";
+  //           moveMade = true;
+  //         }
+  //       }
+  //       clickSound.sound.play();
+  //       setBoard(newBoard);
+  //       setXIsNext(true);
+  //       checkForWinner(newBoard);
+  //     }, 500);
+  //     return () => clearTimeout(timeoutId);
+  //   }
+  // }, [xIsNext, winner, finished]);
+
+  function handleClick(index, socketCall, newB, newStake) {
     if (winner || board[index]) {
       return;
     }
 
-    const newBoard = [...board];
-    newBoard[index] = xIsNext ? "X" : "O";
+    const newBoard = [...newB];
+    const stake = newStake;
+    newBoard[index] = stake;
+    const data = { index, stake, newBoard, newStake };
+    socketCall && socket.emit("on-stake", data);
     clickSound.sound.play();
+    setCurrentStake(newStake === "O" ? "X" : "O");
     setBoard(newBoard);
     setXIsNext(!xIsNext);
-    checkForWinner(newBoard);
+    checkForWinner(newBoard, socketCall);
   }
 
-  function checkForWinner(board) {
+  useEffect(() => {
+    if (socket) {
+      socket.on("on-stake", ({ index, newBoard, newStake }) => {
+        handleClick(index, false, newBoard, newStake);
+        console.log(newStake);
+        newStake !== user && setMyturn(true);
+      });
+      socket.on("on-reset", () => {
+        resetGame();
+      });
+    }
+  }, [socket]);
+
+  function checkForWinner(board, socketCall) {
     const winningLines = [
       [0, 1, 2],
       [3, 4, 5],
@@ -67,18 +125,33 @@ function TicTacToe() {
       const [a, b, c] = winningLines[i];
       if (board[a] && board[a] === board[b] && board[b] === board[c]) {
         setWinner(board[a]);
-        setCelebration(true);
         celebrationSound.sound.play();
-        toast.success(`🏆 ${board[a]} is winne`, {
-          position: "top-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "dark",
-        });
+        if (!socketCall) {
+          if (user === board[a]) {
+            toast.success(`🏆 you is winne`, {
+              position: "top-right",
+              autoClose: 5000,
+              hideProgressBar: false,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: true,
+              progress: undefined,
+              theme: "dark",
+            });
+            setCelebration(true);
+          } else {
+            toast.error(`you is lose`, {
+              position: "top-right",
+              autoClose: 5000,
+              hideProgressBar: false,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: true,
+              progress: undefined,
+              theme: "dark",
+            });
+          }
+        }
         setTimeout(() => {
           setCelebration(false);
         }, 20000);
@@ -109,7 +182,15 @@ function TicTacToe() {
 
   function renderSquare(index) {
     return (
-      <button className="square" onClick={() => handleClick(index)}>
+      <button
+        className="square"
+        onClick={() => {
+          if (myTurn) {
+            handleClick(index, true, board, currentStake);
+            setMyturn(false);
+          }
+        }}
+      >
         {board[index]}
       </button>
     );
@@ -140,7 +221,7 @@ function TicTacToe() {
     setStopedGameSound(!stopedGameSound);
   };
 
-  return (
+  return user ? (
     <div>
       <ToastContainer />
       {celebration && (
@@ -158,7 +239,13 @@ function TicTacToe() {
         />
       )}
       <div className="header">
-        <div className="icon" onClick={resetGame}>
+        <div
+          className="icon"
+          onClick={() => {
+            resetGame();
+            socket.emit("on-reset");
+          }}
+        >
           <TiRefreshOutline color={"#ff00de"} size={20} />
         </div>
         <div className="icon" onClick={handleGameSound}>
@@ -169,7 +256,30 @@ function TicTacToe() {
           )}
         </div>
       </div>
+      <div className="user-wrapper">
+        <div
+          className={
+            myTurn && !winner ? "user-container active" : "user-container"
+          }
+        >
+          {myTurn && !winner && <span className="loader" />}
+          <h2>{user}</h2>
+        </div>
+        <div
+          className={
+            !myTurn && !winner ? "user-container active" : "user-container"
+          }
+        >
+          {!myTurn && !winner && <span className="loader" />}
+          <h2>{user === "X" ? "O" : "X"}</h2>
+        </div>
+      </div>
+      <div className="user-wrapper names">
+        <h3>YOU</h3>
+        <h3>JOHN</h3>
+      </div>
       <div className="tic-tac-toe">
+        {/* <h2>Your Are : {user}</h2> */}
         <div className={`board ${finished && "finished"}`}>
           <div className="row">
             {renderSquare(0)}
@@ -188,10 +298,49 @@ function TicTacToe() {
           </div>
         </div>
         <div className="status">{renderStatus()}</div>
-        <button className="reset" onClick={resetGame}>
+        <button
+          className="btn"
+          onClick={() => {
+            resetGame();
+            socket.emit("on-reset");
+          }}
+        >
           Reset Game
         </button>
       </div>
+    </div>
+  ) : (
+    <div className="choose-player-container">
+      <h4>Please choose your player</h4>
+      <div className="option">
+        <button
+          className={`square choose ${selected === "X" && "selected"}`}
+          onClick={() => {
+            setSelected("X");
+          }}
+        >
+          X
+        </button>
+        <button
+          className={`square choose ${selected === "O" && "selected"}`}
+          onClick={() => {
+            setSelected("O");
+          }}
+        >
+          O
+        </button>
+      </div>
+      <button
+        className={`btn continue ${!selected && "disabled"}`}
+        disabled={!selected}
+        onClick={() => {
+          localStorage.setItem("player", selected);
+          setCurrentStake(selected);
+          setUser(selected);
+        }}
+      >
+        continue
+      </button>
     </div>
   );
 }

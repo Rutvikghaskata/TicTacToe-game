@@ -20,6 +20,10 @@ body {
   justify-content: space-between;
   align-items: center;
   background-color: #ff00de40;
+  width: 100% !important;
+  position: absolute;
+  left: 0;
+  top: -50px;
 }
 
 .header .icon {
@@ -40,7 +44,7 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  /* height: 100vh; */
 }
 
 .board {
@@ -93,6 +97,16 @@ body {
     0px 0px 40px #ff00de, 0px 0px 70px #ff00de, 0px 0px 80px #ff00de,
     0px 0px 100px #ff00de, 0px 0px 150px #ff00de;
 }
+.square.choose {
+  text-shadow: none;
+  border: 2px solid #ff00de50;
+}
+.square.choose:hover {
+  border: 2px solid #ff00de50;
+}
+.square.selected {
+  background-color: #ff00de90 !important;
+}
 
 .square:hover {
   background-color: #ff00de30;
@@ -105,7 +119,7 @@ body {
   font-weight: bold;
 }
 
-.reset {
+.btn {
   margin-top: 20px;
   padding: 10px 20px;
   font-size: 16px;
@@ -119,7 +133,20 @@ body {
   transition: all 0.2s ease-in-out;
 }
 
-.reset:hover {
+.btn:hover {
+  background-color: #ff00de60;
+}
+
+.btn.continue {
+  margin-top: 50px;
+  background-color: #ff00de90;
+  padding: 5px 20px;
+}
+.btn.disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.btn.disabled:hover {
   background-color: #ff00de60;
 }
 
@@ -134,11 +161,71 @@ body {
   pointer-events: none;
 }
 
-@media screen and (max-width: 420px) {
-  .header {
-    width: 100% !important;
-    position: absolute;
-    left: 0;
-    top: -50px;
+.option {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+.choose-player-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.user-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.user-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 80px;
+  width: 80px;
+  border-radius: 50%;
+  border: 2px solid #ff00de60;
+  opacity: 0.5;
+}
+
+.user-container.active {
+  opacity: 1;
+}
+
+.user-wrapper.names h3 {
+  width: 80px;
+  text-align: center;
+}
+
+.user-container h2 {
+  z-index: 1;
+}
+
+.loader {
+  position: absolute;
+  height: calc(100% + 4px);
+  width: calc(100% + 4px);
+  background-color: #ff00de60;
+  border-radius: 50%;
+  background-image: conic-gradient(#000, #ff00de60);
+  background-image: -moz-linear-gradient(#000, #ff00de60);
+  animation: rotate 1s infinite;
+}
+.loader::before {
+  content: "";
+  position: absolute;
+  height: calc(100% - 4px);
+  width: calc(100% - 4px);
+  left: 2px;
+  top: 2px;
+  background-color: #0d1117;
+  border-radius: 50%;
+}
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
